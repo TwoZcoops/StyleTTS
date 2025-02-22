@@ -31,3 +31,4 @@ dependencies:
       - soundfile
       - nltk
       - phonemizer
+      - attrdict
