@@ -30,3 +30,4 @@ dependencies:
   - pip:
       - git+https://github.com/resemble-ai/monotonic_align.git
       - soundfile
+      - nltk
