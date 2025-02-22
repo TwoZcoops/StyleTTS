@@ -29,7 +29,7 @@ This clones **your fork** of StyleTTS into your VS Code workspace.
 If you don’t have the **`styletts`** environment yet, create it using:
 
 ```sh
-conda env create -f requirements.yml
+conda env create -f environment.yml
 ```
 
 Then, **activate the environment**:
@@ -41,12 +41,49 @@ conda activate styletts
 If the environment **already exists**, update it:
 
 ```sh
-conda env update --file requirements.yml --prune
+conda env update --file environment.yml --prune
 ```
 
 ---
 
-## **4️⃣ Verify Everything is Installed**
+## **4️⃣ Install eSpeak (Windows Only)**
+
+For Windows users, **Conda does not provide eSpeak**, so you must install it manually:
+
+### **🔹 Correct eSpeak Installation for Windows**
+
+1. **Download eSpeak** from:  
+   - [📥 eSpeak for Windows](https://espeak.sourceforge.net/download.html)
+
+2. **Run the installer** and follow the steps.
+
+3. **Add eSpeak to System Path:**
+
+   - **Press `Win + R`**, type `sysdm.cpl`, and hit **Enter**.
+
+   - Go to **Advanced** → Click **Environment Variables**.
+
+   - Under **System Variables**, find **Path** and click **Edit**.
+
+   - Click **New**, then add:
+
+     ```sh
+     C:\Program Files\eSpeak
+     ```
+
+   - Click **OK** → **OK**.
+
+4. **Restart your computer OR restart your VS Code terminal**.
+
+5. Verify installation by running:
+
+   ```sh
+   espeak "Hello, this is a test."
+   ```
+
+---
+
+## **5️⃣ Verify Everything is Installed**
 
 Check if your environment has the correct packages:
 
@@ -60,7 +97,7 @@ You should see the Conda environment path (e.g., `C:\Users\YourName\anaconda3\en
 
 ---
 
-## **5️⃣ Download Pretrained Models**
+## **6️⃣ Download Pretrained Models**
 
 You **must download pretrained models** for inference.
 
@@ -77,7 +114,7 @@ You **must download pretrained models** for inference.
 **Extract these files** into:
 
 ```sh
-mkdir Models Vocoder
+mkdir Models Vocoder  # Windows users: If this fails, use `md Models Vocoder`
 unzip Models.zip -d Models
 unzip Vocoder.zip -d Vocoder
 ```
@@ -89,17 +126,19 @@ OR manually move the extracted files to:
 
 ---
 
-## **6️⃣ Run Inference**
+## **7️⃣ Run Inference**
 
 Now, you can **generate speech from text**!
 
-### **Option 1: Using Jupyter Notebook**
+### **Option 1: Using Jupyter Notebook (Recommended)**
 
-Start Jupyter:
+Start Jupyter inside your **VS Code terminal** or command prompt:
 
 ```sh
 jupyter notebook
 ```
+
+This will open Jupyter Notebook in your browser.
 
 Open:
 
@@ -108,28 +147,42 @@ Open:
 
 Run each cell to generate speech.
 
+#### **Real-Time Logs in Jupyter**
+
+To see logs while running the notebook:
+
+1. Open **Jupyter's main page (`localhost:8888/tree`)**.
+
+2. Click **"New" > "Terminal"**.
+
+3. Run:
+
+   ```sh
+   conda activate styletts
+   jupyter notebook
+   ```
+
+Now, the **logs will appear in the terminal** while you run the notebook.
+
 ### **Option 2: Using a Python Script**
 
 If you prefer a script, create `inference.py` and paste:
 
 ```python
 import torch
-from styletts2 import StyleTTS2
+from models import *  # Load from models.py (not styletts2)
 
-# Initialize the model
-model = StyleTTS2()
+try:
+    model = StyleTTS()  # Using the correct class from models.py
+except NameError:
+    print("❌ StyleTTS class not found in models.py. Check its name.")
+    exit()
 
-# Input text
 text = "Hello, this is StyleTTS generating speech naturally."
-
-# Run inference
 audio = model.inference(text)
-
-# Save the audio file
 with open("output.wav", "wb") as f:
     f.write(audio)
-
-print("Speech synthesis complete! Output saved as output.wav")
+print("✅ Speech synthesis complete! Output saved as output.wav")
 ```
 
 Run it:
@@ -142,7 +195,7 @@ This generates `output.wav` with AI-generated speech.
 
 ---
 
-## **7️⃣ Sync Your Fork with the Original Repo**
+## **8️⃣ Sync Your Fork with the Original Repo**
 
 To keep your fork **up to date**, run:
 
