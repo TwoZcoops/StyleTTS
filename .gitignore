@@ -1,0 +1,33 @@
+echo "
+# Ignore compiled Python files
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# Ignore all models and vocoder files
+Models/
+Vocoder/
+Utils/ASR/
+
+# Ignore large specific model checkpoint files
+Models/LJSpeech/
+Vocoder/g_*
+Utils/ASR/epoch_*.pth
+
+# Ignore dataset files
+Data/LJSpeech-1.1/
+Data/**/*.wav
+Data/**/*.csv
+Data/**/*.txt
+
+# Ignore large audio & temp files
+*.wav
+*.mp3
+*.flac
+*.tmp
+*.log
+*.bak
+checkpoint/
+logs/
+" > .gitignore
