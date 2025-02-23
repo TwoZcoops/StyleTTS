@@ -2,3 +2,4 @@ __pycache__/
 # Ignore large models
 Models/LJSpeech/*.pth
 Vocoder/g_*
+Utils/ASR/epoch_*.pth
