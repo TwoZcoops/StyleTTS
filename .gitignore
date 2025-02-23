@@ -1,7 +1,15 @@
+# Ignore compiled Python files
 __pycache__/
-# Ignore large models
-Models/LJSpeech/*.pth
-Vocoder/g_*
-Utils/ASR/epoch_*.pth
+*.pyc
+*.pyo
+*.pyd
+
+# Ignore all models and vocoder files
 Models/
 Vocoder/
+Utils/ASR/
+
+# Ignore large specific model checkpoint files
+Models/LJSpeech/
+Vocoder/g_*
+Utils/ASR/epoch_*.pth
