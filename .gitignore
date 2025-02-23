@@ -13,3 +13,9 @@ Utils/ASR/
 Models/LJSpeech/
 Vocoder/g_*
 Utils/ASR/epoch_*.pth
+
+# Ignore dataset files
+Data/LJSpeech-1.1/
+Data/**/*.wav
+Data/**/*.csv
+Data/**/*.txt
