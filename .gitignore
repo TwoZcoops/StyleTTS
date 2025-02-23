@@ -1,1 +1,4 @@
 __pycache__/
+# Ignore large models
+Models/LJSpeech/*.pth
+Vocoder/g_*
