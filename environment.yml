@@ -26,6 +26,7 @@ dependencies:
   - tensorboard
   - ipython  # Helps with debugging and interactive work
   - jupyter  # Required if you want to run notebooks
+  - einops  # ✅ Added einops
   - pip:
       - git+https://github.com/resemble-ai/monotonic_align.git
       - soundfile
