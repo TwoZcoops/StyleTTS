@@ -33,3 +33,4 @@ dependencies:
       - nltk
       - phonemizer
       - attrdict
+      - einops_exts  # ✅ Added einops_exts
