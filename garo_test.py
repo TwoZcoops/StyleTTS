@@ -1,49 +1,70 @@
 import os
 import sys
-import random
-import yaml
-from munch import Munch
-import numpy as np
-import torch
-from torch import nn
-import torch.nn.functional as F
-import torchaudio
-import librosa
-from nltk.tokenize import word_tokenize
 
-# --- Section 1: Directory Check and Adjustment ---
-
+print("--- Diagnostic Script ---")
 print(f"Current working directory: {os.getcwd()}")
 
-# Adjust this line as needed based on the output of getcwd()
-os.chdir("Demo")  # Or "StyleTTS/Demo", or the full path
+# Calculate absolute paths
+modules_path = os.path.abspath(os.path.join(".", "Modules"))
+utils_path = os.path.abspath(os.path.join(".", "Utils"))
 
-print(f"New working directory: {os.getcwd()}")
+print(f"Calculated Modules path: {modules_path}")
+print(f"Calculated Utils path: {utils_path}")
 
-# --- Section 2: Add Demo to sys.path (TEMPORARY) ---
-sys.path.append(os.getcwd())  # Add current (Demo) directory
+# Check if paths exist
+if os.path.exists(modules_path):
+    print("✅ Modules directory exists.")
+else:
+    print(f"❌ Modules directory NOT found at: {modules_path}")
 
-# --- Section 3: Imports that Depend on the Working Directory ---
+if os.path.exists(utils_path):
+    print("✅ Utils directory exists.")
+else:
+    print(f"❌ Utils directory NOT found at: {utils_path}")
+
+# Check for models.py and utils.py
+if os.path.exists(os.path.join(modules_path, "models.py")):
+    print("✅ models.py found inside Modules.")
+else:
+    print(f"❌ models.py NOT found at: {os.path.join(modules_path, 'models.py')}")
+
+if os.path.exists(os.path.join(utils_path, "utils.py")):
+    print("✅ utils.py found inside Utils.")
+else:
+    print(f"❌ utils.py NOT found at: {os.path.join(utils_path, 'utils.py')}")
+# --- sys.path modification ---
+
+sys.path.insert(0, modules_path)
+sys.path.insert(0, utils_path)
+
+print(f"Modified sys.path: {sys.path}")
+
+# --- Attempt Imports ---
 try:
-    from models import *
-    from utils import *
-    print("✅ Successfully imported models and utils!")
+    import models
+    print("✅ Successfully imported models (as a module)")
 except ImportError as e:
-    print(f"❌ Import Error: {e}")
-    sys.exit(1)  # Exit if imports fail
-
-# --- Section 4: eSpeak NG Check ---
-
-try:
-    from phonemizer.backend import EspeakBackend
-    backend = EspeakBackend("en-us")
-    print("✅ eSpeak is properly detected by Phonemizer!")
-except Exception as e:
-    print(f"❌ eSpeak detection failed: {e}")
+    print(f"❌ Import Error (models): {e}")
     sys.exit(1)
 
-# --- Section 5: Device Check ---
-device = "cuda" if torch.cuda.is_available() else "cpu"
-print(f"Using device: {device}")
+try:
+    from models import StyleTTS2  # Try importing something *specific*
+    print("✅ Successfully imported StyleTTS2 from models")
+except ImportError as e:
+    print(f"❌ Import Error (StyleTTS2): {e}")
+    sys.exit(1)
+try:
+    import utils
+    print("✅ Successfully imported utils (as a module)")
+except ImportError as e:
+    print(f"❌ Import Error (models): {e}")
+    sys.exit(1)
 
-print("✅ All preliminary checks passed!")
+try:
+    from utils import get_configs_of
+    print("✅ Successfully imported get_configs_of from utils")
+except ImportError as e:
+    print(f"❌ Import Error (get_configs_of): {e}")
+    sys.exit(1)
+
+print("✅ All import checks passed (from test.py)!")
