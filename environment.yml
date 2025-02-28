@@ -1,0 +1,34 @@
+name: styletts
+channels:
+  - pytorch
+  - nvidia
+  - conda-forge
+  - defaults
+
+dependencies:
+  - python=3.9
+  - pip
+  - pytorch=2.5.1
+  - torchvision=0.20.1
+  - torchaudio=2.5.1
+  - pytorch-cuda=11.8
+  - numpy
+  - scipy
+  - librosa
+  - tqdm
+  - pydub
+  - transformers
+  - ffmpeg  # Required for audio processing
+  - click
+  - munch
+  - pyyaml
+  - pandas
+  - tensorboard
+  - ipython  # Helps with debugging and interactive work
+  - jupyter  # Required if you want to run notebooks
+  - pip:
+      - git+https://github.com/resemble-ai/monotonic_align.git
+      - soundfile
+      - nltk
+      - phonemizer
+      - attrdict
