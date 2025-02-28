@@ -1,0 +1,8 @@
+{
+  "default": true,
+  "MD033": {
+    "allowed_elements": ["img", "br"]
+  },
+  "line-length": false,
+  "no-trailing-punctuation": false
+}
