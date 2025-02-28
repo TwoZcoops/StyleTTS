@@ -51,7 +51,6 @@ class MultiOptimizer:
             _ = [self.schedulers[key].step(*args) for key in self.keys]
 
 def define_scheduler(optimizer, params):
-    print(params)
     scheduler = torch.optim.lr_scheduler.OneCycleLR(
         optimizer,
         max_lr=params.get('max_lr', 2e-4),
@@ -63,8 +62,8 @@ def define_scheduler(optimizer, params):
 
     return scheduler
 
-def build_optimizer(parameters_dict, scheduler_params_dict):
-    optim = dict([(key, AdamW(params, lr=1e-4, weight_decay=1e-4, betas=(0.0, 0.99), eps=1e-9))
+def build_optimizer(parameters_dict, scheduler_params_dict, lr):
+    optim = dict([(key, AdamW(params, lr=lr, weight_decay=1e-4, betas=(0.0, 0.99), eps=1e-9))
                    for key, params in parameters_dict.items()])
 
     schedulers = dict([(key, define_scheduler(opt, scheduler_params_dict[key])) \

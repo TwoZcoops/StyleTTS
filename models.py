@@ -15,6 +15,12 @@ from torch.nn.utils import weight_norm, remove_weight_norm, spectral_norm
 from Utils.ASR.models import ASRCNN
 from Utils.JDC.model import JDCNet
 
+from Modules.diffusion.sampler import KDiffusion, LogNormalDistribution
+from Modules.diffusion.modules import Transformer1d, StyleTransformer1d
+from Modules.diffusion.diffusion import AudioDiffusionConditional
+
+from Modules.discriminators import MultiPeriodDiscriminator, MultiResSpecDiscriminator, WavLMDiscriminator
+
 from munch import Munch
 import yaml
 
@@ -339,6 +345,7 @@ class TextEncoder(nn.Module):
         return mask
 
 
+
 class AdaIN1d(nn.Module):
     def __init__(self, style_dim, num_features):
         super().__init__()
@@ -407,64 +414,6 @@ class AdainResBlk1d(nn.Module):
         out = self._residual(x, s)
         out = (out + self._shortcut(x)) / math.sqrt(2)
         return out
-
-
-class Decoder(nn.Module):
-    def __init__(self, dim_in=512, style_dim=64, residual_dim=64, dim_out=80):
-        super().__init__()
-        
-        self.decode = nn.ModuleList()
-        
-        self.bottleneck_dim = dim_in * 2
-        
-        self.encode = nn.Sequential(ResBlk1d(dim_in + 2, self.bottleneck_dim, normalize=True),
-                                      ResBlk1d(self.bottleneck_dim, self.bottleneck_dim, normalize=True))
-        
-        self.decode.append(AdainResBlk1d(self.bottleneck_dim + residual_dim + 2, self.bottleneck_dim, style_dim))
-        self.decode.append(AdainResBlk1d(self.bottleneck_dim + residual_dim + 2, self.bottleneck_dim, style_dim))
-        self.decode.append(AdainResBlk1d(self.bottleneck_dim + residual_dim + 2, dim_in, style_dim, upsample=True))
-        self.decode.append(AdainResBlk1d(dim_in, dim_in, style_dim))
-        self.decode.append(AdainResBlk1d(dim_in, dim_in, style_dim))
-
-        self.F0_conv = nn.Sequential(
-            ResBlk1d(1, residual_dim, normalize=True, downsample=True),
-            weight_norm(nn.Conv1d(residual_dim, 1, kernel_size=1)),
-            nn.InstanceNorm1d(1, affine=True)
-        )
-        
-        self.N_conv = nn.Sequential(
-            ResBlk1d(1, residual_dim, normalize=True, downsample=True),
-            weight_norm(nn.Conv1d(residual_dim, 1, kernel_size=1)),
-            nn.InstanceNorm1d(1, affine=True)
-        )
-        
-        self.asr_res = nn.Sequential(
-            weight_norm(nn.Conv1d(dim_in, residual_dim, kernel_size=1)),
-            nn.InstanceNorm1d(residual_dim, affine=True)
-        )
-        
-        self.to_out = nn.Sequential(weight_norm(nn.Conv1d(dim_in, dim_out, 1, 1, 0)))
-        
-    def forward(self, asr, F0, N, s):        
-        F0 = self.F0_conv(F0.unsqueeze(1))
-        N = self.N_conv(N.unsqueeze(1))
-        
-        x = torch.cat([asr, F0, N], axis=1)
-        x = self.encode(x)
-        
-        asr_res = self.asr_res(asr)
-        
-        res = True
-        for block in self.decode:
-            if res:
-                x = torch.cat([x, asr_res, F0, N], axis=1)
-            x = block(x, s)
-            if block.upsample_type != "none":
-                res = False
-                
-        x = self.to_out(x)
-        return x
-    
     
 class AdaLayerNorm(nn.Module):
     def __init__(self, style_dim, channels, eps=1e-5):
@@ -487,22 +436,10 @@ class AdaLayerNorm(nn.Module):
         x = F.layer_norm(x, (self.channels,), eps=self.eps)
         x = (1 + gamma) * x + beta
         return x.transpose(1, -1).transpose(-1, -2)
-    
-class LinearNorm(torch.nn.Module):
-    def __init__(self, in_dim, out_dim, bias=True, w_init_gain='linear'):
-        super(LinearNorm, self).__init__()
-        self.linear_layer = torch.nn.Linear(in_dim, out_dim, bias=bias)
-
-        torch.nn.init.xavier_uniform_(
-            self.linear_layer.weight,
-            gain=torch.nn.init.calculate_gain(w_init_gain))
-
-    def forward(self, x):
-        return self.linear_layer(x)
 
 class ProsodyPredictor(nn.Module):
 
-    def __init__(self, style_dim, d_hid, nlayers, dropout=0.1):
+    def __init__(self, style_dim, d_hid, nlayers, max_dur=50, dropout=0.1):
         super().__init__() 
         
         self.text_encoder = DurationEncoder(sty_dim=style_dim, 
@@ -511,7 +448,7 @@ class ProsodyPredictor(nn.Module):
                                             dropout=dropout)
 
         self.lstm = nn.LSTM(d_hid + style_dim, d_hid // 2, 1, batch_first=True, bidirectional=True)
-        self.duration_proj = LinearNorm(d_hid, 1)
+        self.duration_proj = LinearNorm(d_hid, max_dur)
         
         self.shared = nn.LSTM(d_hid + style_dim, d_hid // 2, 1, batch_first=True, bidirectional=True)
         self.F0 = nn.ModuleList()
@@ -674,30 +611,95 @@ def load_ASR_models(ASR_MODEL_PATH, ASR_MODEL_CONFIG):
 
     return asr_model
 
-def build_model(args, text_aligner, pitch_extractor):
-
-    decoder = Decoder(dim_in=args.hidden_dim, style_dim=args.style_dim, dim_out=args.n_mels)
-    text_encoder = TextEncoder(channels=args.hidden_dim, kernel_size=5, depth=args.n_layer, n_symbols=args.n_token)
-    predictor = ProsodyPredictor(style_dim=args.style_dim, d_hid=args.hidden_dim, nlayers=args.n_layer, dropout=args.dropout)
-    style_encoder = StyleEncoder(dim_in=args.dim_in, style_dim=args.style_dim, max_conv_dim=args.hidden_dim)
-    discriminator = Discriminator2d(dim_in=args.dim_in, num_domains=1, max_conv_dim=args.hidden_dim)
+def build_model(args, text_aligner, pitch_extractor, bert):
+    assert args.decoder.type in ['istftnet', 'hifigan'], 'Decoder type unknown'
+    
+    if args.decoder.type == "istftnet":
+        from Modules.istftnet import Decoder
+        decoder = Decoder(dim_in=args.hidden_dim, style_dim=args.style_dim, dim_out=args.n_mels,
+                resblock_kernel_sizes = args.decoder.resblock_kernel_sizes,
+                upsample_rates = args.decoder.upsample_rates,
+                upsample_initial_channel=args.decoder.upsample_initial_channel,
+                resblock_dilation_sizes=args.decoder.resblock_dilation_sizes,
+                upsample_kernel_sizes=args.decoder.upsample_kernel_sizes, 
+                gen_istft_n_fft=args.decoder.gen_istft_n_fft, gen_istft_hop_size=args.decoder.gen_istft_hop_size) 
+    else:
+        from Modules.hifigan import Decoder
+        decoder = Decoder(dim_in=args.hidden_dim, style_dim=args.style_dim, dim_out=args.n_mels,
+                resblock_kernel_sizes = args.decoder.resblock_kernel_sizes,
+                upsample_rates = args.decoder.upsample_rates,
+                upsample_initial_channel=args.decoder.upsample_initial_channel,
+                resblock_dilation_sizes=args.decoder.resblock_dilation_sizes,
+                upsample_kernel_sizes=args.decoder.upsample_kernel_sizes) 
         
-    nets = Munch(predictor=predictor,
-        decoder=decoder,
-                 pitch_extractor=pitch_extractor,
-                     text_encoder=text_encoder,
-                     style_encoder=style_encoder,
-                 text_aligner = text_aligner,
-                discriminator=discriminator)
+    text_encoder = TextEncoder(channels=args.hidden_dim, kernel_size=5, depth=args.n_layer, n_symbols=args.n_token)
+    
+    predictor = ProsodyPredictor(style_dim=args.style_dim, d_hid=args.hidden_dim, nlayers=args.n_layer, max_dur=args.max_dur, dropout=args.dropout)
+    
+    style_encoder = StyleEncoder(dim_in=args.dim_in, style_dim=args.style_dim, max_conv_dim=args.hidden_dim) # acoustic style encoder
+    predictor_encoder = StyleEncoder(dim_in=args.dim_in, style_dim=args.style_dim, max_conv_dim=args.hidden_dim) # prosodic style encoder
+        
+    # define diffusion model
+    if args.multispeaker:
+        transformer = StyleTransformer1d(channels=args.style_dim*2, 
+                                    context_embedding_features=bert.config.hidden_size,
+                                    context_features=args.style_dim*2, 
+                                    **args.diffusion.transformer)
+    else:
+        transformer = Transformer1d(channels=args.style_dim*2, 
+                                    context_embedding_features=bert.config.hidden_size,
+                                    **args.diffusion.transformer)
+    
+    diffusion = AudioDiffusionConditional(
+        in_channels=1,
+        embedding_max_length=bert.config.max_position_embeddings,
+        embedding_features=bert.config.hidden_size,
+        embedding_mask_proba=args.diffusion.embedding_mask_proba, # Conditional dropout of batch elements,
+        channels=args.style_dim*2,
+        context_features=args.style_dim*2,
+    )
+    
+    diffusion.diffusion = KDiffusion(
+        net=diffusion.unet,
+        sigma_distribution=LogNormalDistribution(mean = args.diffusion.dist.mean, std = args.diffusion.dist.std),
+        sigma_data=args.diffusion.dist.sigma_data, # a placeholder, will be changed dynamically when start training diffusion model
+        dynamic_threshold=0.0 
+    )
+    diffusion.diffusion.net = transformer
+    diffusion.unet = transformer
+
+    
+    nets = Munch(
+            bert=bert,
+            bert_encoder=nn.Linear(bert.config.hidden_size, args.hidden_dim),
+
+            predictor=predictor,
+            decoder=decoder,
+            text_encoder=text_encoder,
+
+            predictor_encoder=predictor_encoder,
+            style_encoder=style_encoder,
+            diffusion=diffusion,
+
+            text_aligner = text_aligner,
+            pitch_extractor=pitch_extractor,
+
+            mpd = MultiPeriodDiscriminator(),
+            msd = MultiResSpecDiscriminator(),
+        
+            # slm discriminator head
+            wd = WavLMDiscriminator(args.slm.hidden, args.slm.nlayers, args.slm.initial_channel),
+       )
+    
     return nets
 
-def load_checkpoint(model, optimizer, path, load_only_params=True):
+def load_checkpoint(model, optimizer, path, load_only_params=True, ignore_modules=[]):
     state = torch.load(path, map_location='cpu')
     params = state['net']
     for key in model:
-        if key in params:
+        if key in params and key not in ignore_modules:
             print('%s loaded' % key)
-            model[key].load_state_dict(params[key])
+            model[key].load_state_dict(params[key], strict=False)
     _ = [model[key].eval() for key in model]
     
     if not load_only_params:

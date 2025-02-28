@@ -9,6 +9,7 @@ import torch.nn.functional as F
 import torchaudio
 import librosa
 import matplotlib.pyplot as plt
+from munch import Munch
 
 def maximum_path(neg_cent, mask):
   """ Cython optimized version.
@@ -43,29 +44,6 @@ def length_to_mask(lengths):
     mask = torch.gt(mask+1, lengths.unsqueeze(1))
     return mask
 
-# for adversarial loss
-def adv_loss(logits, target):
-    assert target in [1, 0]
-    if len(logits.shape) > 1:
-        logits = logits.reshape(-1)
-    targets = torch.full_like(logits, fill_value=target)
-    logits = logits.clamp(min=-10, max=10) # prevent nan
-    loss = F.binary_cross_entropy_with_logits(logits, targets)
-    return loss
-
-# for R1 regularization loss
-def r1_reg(d_out, x_in):
-    # zero-centered gradient penalty for real images
-    batch_size = x_in.size(0)
-    grad_dout = torch.autograd.grad(
-        outputs=d_out.sum(), inputs=x_in,
-        create_graph=True, retain_graph=True, only_inputs=True
-    )[0]
-    grad_dout2 = grad_dout.pow(2)
-    assert(grad_dout2.size() == x_in.size())
-    reg = 0.5 * grad_dout2.view(batch_size, -1).sum(1).mean(0)
-    return reg
-
 # for norm consistency loss
 def log_norm(x, mean=-4, std=4, dim=2):
     """
@@ -81,3 +59,16 @@ def get_image(arrs):
     ax.imshow(arrs)
 
     return fig
+
+def recursive_munch(d):
+    if isinstance(d, dict):
+        return Munch((k, recursive_munch(v)) for k, v in d.items())
+    elif isinstance(d, list):
+        return [recursive_munch(v) for v in d]
+    else:
+        return d
+    
+def log_print(message, logger):
+    logger.info(message)
+    print(message)
+    

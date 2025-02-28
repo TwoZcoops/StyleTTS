@@ -18,8 +18,6 @@ import logging
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.DEBUG)
 
-import os
-import os.path as osp
 import pandas as pd
 
 _pad = "$"
@@ -70,18 +68,23 @@ def preprocess(wave):
 class FilePathDataset(torch.utils.data.Dataset):
     def __init__(self,
                  data_list,
+                 root_path,
                  sr=24000,
                  data_augmentation=False,
                  validation=False,
+                 OOD_data="Data/OOD_texts.txt",
+                 min_length=50,
                  ):
 
         spect_params = SPECT_PARAMS
         mel_params = MEL_PARAMS
 
-        _data_list = [l[:-1].split('|') for l in data_list]
+        _data_list = [l.strip().split('|') for l in data_list]
         self.data_list = [data if len(data) == 3 else (*data, 0) for data in _data_list]
         self.text_cleaner = TextCleaner()
         self.sr = sr
+
+        self.df = pd.DataFrame(self.data_list)
 
         self.to_melspec = torchaudio.transforms.MelSpectrogram(**MEL_PARAMS)
 
@@ -89,7 +92,13 @@ class FilePathDataset(torch.utils.data.Dataset):
         self.data_augmentation = data_augmentation and (not validation)
         self.max_mel_length = 192
         
-#         self.global_phonemizer = phonemizer.backend.EspeakBackend(language='en-us', preserve_punctuation=True,  with_stress=True)
+        self.min_length = min_length
+        with open(OOD_data, 'r', encoding='utf-8') as f:
+            tl = f.readlines()
+        idx = 1 if '.wav' in tl[0].split('|')[0] else 0
+        self.ptexts = [t.split('|')[idx] for t in tl]
+        
+        self.root_path = root_path
 
     def __len__(self):
         return len(self.data_list)
@@ -106,12 +115,30 @@ class FilePathDataset(torch.utils.data.Dataset):
         length_feature = acoustic_feature.size(1)
         acoustic_feature = acoustic_feature[:, :(length_feature - length_feature % 2)]
         
-        return speaker_id, acoustic_feature, text_tensor, path
+        # get reference sample
+        ref_data = (self.df[self.df[2] == str(speaker_id)]).sample(n=1).iloc[0].tolist()
+        ref_mel_tensor, ref_label = self._load_data(ref_data[:3])
+        
+        # get OOD text
+        
+        ps = ""
+        
+        while len(ps) < self.min_length:
+            rand_idx = np.random.randint(0, len(self.ptexts) - 1)
+            ps = self.ptexts[rand_idx]
+            
+            text = self.text_cleaner(ps)
+            text.insert(0, 0)
+            text.append(0)
+
+            ref_text = torch.LongTensor(text)
+        
+        return speaker_id, acoustic_feature, text_tensor, ref_text, ref_mel_tensor, ref_label, path, wave
 
     def _load_tensor(self, data):
         wave_path, text, speaker_id = data
         speaker_id = int(speaker_id)
-        wave, sr = sf.read(wave_path)
+        wave, sr = sf.read(osp.join(self.root_path, wave_path))
         if wave.shape[-1] == 2:
             wave = wave[:, 0].squeeze()
         if sr != 24000:
@@ -166,38 +193,55 @@ class Collater(object):
         nmels = batch[0][1].size(0)
         max_mel_length = max([b[1].shape[1] for b in batch])
         max_text_length = max([b[2].shape[0] for b in batch])
+        max_rtext_length = max([b[3].shape[0] for b in batch])
 
+        labels = torch.zeros((batch_size)).long()
         mels = torch.zeros((batch_size, nmels, max_mel_length)).float()
         texts = torch.zeros((batch_size, max_text_length)).long()
+        ref_texts = torch.zeros((batch_size, max_rtext_length)).long()
+
         input_lengths = torch.zeros(batch_size).long()
+        ref_lengths = torch.zeros(batch_size).long()
         output_lengths = torch.zeros(batch_size).long()
+        ref_mels = torch.zeros((batch_size, nmels, self.max_mel_length)).float()
+        ref_labels = torch.zeros((batch_size)).long()
         paths = ['' for _ in range(batch_size)]
+        waves = [None for _ in range(batch_size)]
         
-        for bid, (label, mel, text, path) in enumerate(batch):
+        for bid, (label, mel, text, ref_text, ref_mel, ref_label, path, wave) in enumerate(batch):
             mel_size = mel.size(1)
             text_size = text.size(0)
+            rtext_size = ref_text.size(0)
+            labels[bid] = label
             mels[bid, :, :mel_size] = mel
             texts[bid, :text_size] = text
+            ref_texts[bid, :rtext_size] = ref_text
             input_lengths[bid] = text_size
+            ref_lengths[bid] = rtext_size
             output_lengths[bid] = mel_size
             paths[bid] = path
+            ref_mel_size = ref_mel.size(1)
+            ref_mels[bid, :, :ref_mel_size] = ref_mel
             
-        if self.return_wave:
-            return paths, texts, input_lengths, mels, output_lengths
-            
-        return texts, input_lengths, mels, output_lengths
+            ref_labels[bid] = ref_label
+            waves[bid] = wave
+
+        return waves, texts, input_lengths, ref_texts, ref_lengths, mels, output_lengths, ref_mels
 
 
 
 def build_dataloader(path_list,
+                     root_path,
                      validation=False,
+                     OOD_data="Data/OOD_texts.txt",
+                     min_length=50,
                      batch_size=4,
                      num_workers=1,
                      device='cpu',
                      collate_config={},
                      dataset_config={}):
     
-    dataset = FilePathDataset(path_list, validation=validation, **dataset_config)
+    dataset = FilePathDataset(path_list, root_path, OOD_data=OOD_data, min_length=min_length, validation=validation, **dataset_config)
     collate_fn = Collater(**collate_config)
     data_loader = DataLoader(dataset,
                              batch_size=batch_size,
@@ -208,3 +252,4 @@ def build_dataloader(path_list,
                              pin_memory=(device != 'cpu'))
 
     return data_loader
+
