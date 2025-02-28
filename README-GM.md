@@ -1,23 +1,29 @@
-# **🚀 Optimized Setup Guide for StyleTTS (GM's VS Code & Jupyter Workspace)**  
+# **🚀 Optimized Setup Guide for StyleTTS (VS Code & Jupyter)**
 
-This guide walks through **setting up StyleTTS** from scratch in **VS Code (Windows) using Conda & Jupyter Notebook** while ensuring **Phonemizer & eSpeak NG** are correctly configured.
-
----
-
-## **1️⃣ Prerequisites**  
-
-- **Git** → [Download Git](https://git-scm.com/downloads)  
-- **VS Code** → [Download VS Code](https://code.visualstudio.com/)  
-- **Miniconda/Anaconda** → [Download Conda](https://docs.conda.io/en/latest/miniconda.html)  
-- **Jupyter Notebook** (installed via Conda)  
-- **Git LFS** → Install via `git lfs install`
+This guide provides a **step-by-step walkthrough** to set up **StyleTTS in VS Code on Windows** using **Conda & Jupyter Notebook**, while ensuring **Phonemizer & eSpeak NG** are correctly configured.
 
 ---
 
-## **2️⃣ Fork & Clone the StyleTTS Repository**  
+## **1️⃣ Prerequisites**
+
+Before starting, make sure you have the following installed:
+
+- ✅ **Git** → [Download Git](https://git-scm.com/downloads)
+- ✅ **VS Code** → [Download VS Code](https://code.visualstudio.com/)
+- ✅ **Miniconda/Anaconda** → [Download Conda](https://docs.conda.io/en/latest/miniconda.html)
+- ✅ **Jupyter Notebook** (installed via Conda)
+- ✅ **Git LFS (Large File Storage)** → Install with:
+
+  ```sh
+  git lfs install
+  ```
+
+---
+
+## **2️⃣ Clone the StyleTTS Repository**
 
 1. **Fork the repository** on GitHub:  
-   Go to [https://github.com/yl4579/StyleTTS](https://github.com/yl4579/StyleTTS) and click **Fork**.
+   - Go to [https://github.com/yl4579/StyleTTS](https://github.com/yl4579/StyleTTS) and click **Fork**.
 2. **Clone your fork** in VS Code:
 
    ```sh
@@ -28,9 +34,9 @@ This guide walks through **setting up StyleTTS** from scratch in **VS Code (Wind
 
 ---
 
-## **3️⃣ Set Up Git LFS Before Doing Anything Else**  
+## **3️⃣ Set Up Git LFS Before Doing Anything Else**
 
-Large `.pth` model files **must NOT** be committed to Git. Set up Git LFS immediately:
+Since `.pth` model files **should not** be committed to Git, set up Git LFS immediately:
 
 ```sh
 git lfs install
@@ -43,9 +49,9 @@ git commit -m "Set up Git LFS for model files"
 
 ---
 
-## **4️⃣ Configure Upstream Remote (So You Can Sync Updates)**  
+## **4️⃣ Configure Upstream Remote (For Syncing Updates)**
 
-Ensure your fork is set to track the original repo:
+Ensure your fork is set to track the **original repo**:
 
 ```sh
 git remote add upstream https://github.com/yl4579/StyleTTS.git
@@ -53,7 +59,7 @@ git fetch upstream
 git merge upstream/main
 ```
 
-✅ Sync later with:
+✅ To **sync updates later**, run:
 
 ```sh
 git fetch upstream
@@ -63,9 +69,9 @@ git push origin main
 
 ---
 
-## **5️⃣ Set Up the Conda Environment**  
+## **5️⃣ Create & Activate the Conda Environment**
 
-If you don’t have the **`styletts`** environment, create it:
+If you don’t already have the **`styletts`** environment, create it:
 
 ```sh
 conda env create -f environment.yml
@@ -77,7 +83,7 @@ Then activate:
 conda activate styletts
 ```
 
-Update later with:
+To update later:
 
 ```sh
 conda env update --file environment.yml --prune
@@ -85,40 +91,34 @@ conda env update --file environment.yml --prune
 
 ---
 
-## **6️⃣ Install eSpeak NG (Windows Only)**  
+## **6️⃣ Install eSpeak NG (Windows Only)**
 
-### **🔹 Correct eSpeak NG Installation for Windows**  
+### **🔹 Correct eSpeak NG Installation for Windows**
 
 1. **Download eSpeak NG** from:  
-   - [📥 eSpeak NG for Windows](https://github.com/espeak-ng/espeak-ng/releases)  
-
-2. **Run the installer** and follow the steps.  
-
+   - [📥 eSpeak NG for Windows](https://github.com/espeak-ng/espeak-ng/releases)
+2. **Run the installer** and follow the steps.
 3. **Verify installation by checking the DLL location:**  
-   Open a **PowerShell terminal** and run:  
+   Open a **PowerShell terminal** and run:
 
    ```powershell
    dir "C:\Program Files\eSpeak NG\*.dll"
    ```
 
    You should see **`libespeak-ng.dll`** in the output.
-
-4. **Add eSpeak NG to System PATH (Required for Phonemizer)**  
-
-   - **Press `Win + R`**, type `sysdm.cpl`, and hit **Enter**.  
-   - Go to **Advanced** → Click **Environment Variables**.  
-   - Under **System Variables**, find **Path** and click **Edit**.  
-   - Click **New**, then add:  
+4. **Manually Add eSpeak NG to System PATH (Required for Phonemizer)**
+   - **Press `Win + R`**, type `sysdm.cpl`, and hit **Enter**.
+   - Go to **Advanced** → Click **Environment Variables**.
+   - Under **System Variables**, find **Path** and click **Edit**.
+   - Click **New**, then add:
 
      ```sh
      C:\Program Files\eSpeak NG
      ```
 
-   - Click **OK** → **OK**.  
-
-5. **Restart your computer OR restart your VS Code terminal**.
-
-6. **Verify installation by running**:  
+   - Click **OK** → **OK**.
+5. **Restart your computer OR restart your VS Code terminal.**
+6. **Verify installation by running:**
 
    ```sh
    espeak-ng "Hello, this is a test."
@@ -128,133 +128,86 @@ conda env update --file environment.yml --prune
 
 ---
 
-## **7️⃣ Fixing Phonemizer Issues (eSpeak NG Not Detected)**  
+## **7️⃣ Ensure VS Code Loads eSpeak NG Correctly**
 
-Phonemizer needs **explicit paths** for eSpeak NG.  
+Since VS Code sometimes **does not inherit environment variables**, update your **VS Code `settings.json`**:
 
-In Python, add:  
+1. Open **VS Code**.
+2. Press **`Ctrl + Shift + P`** → Type `"Preferences: Open User Settings (JSON)"` → Select it.
+3. Inside the `"windows"` section, add:
 
-```python
-import os
-from phonemizer.backend.espeak.wrapper import EspeakWrapper
+   ```json
+   "terminal.integrated.env.windows": {
+       "PHONEMIZER_ESPEAK_LIBRARY": "C:\\Program Files\\eSpeak NG\\libespeak-ng.dll",
+       "ESPEAK_DATA_PATH": "C:\\Program Files\\eSpeak NG\\espeak-ng-data",
+       "PHONEMIZER_ESPEAK_PATH": "C:\\Program Files\\eSpeak NG\\espeak-ng.exe"
+   }
+   ```
 
-# Manually set eSpeak NG library path
-os.environ["ESPEAK_LIBRARY"] = r"C:\Program Files\eSpeak NG\libespeak-ng.dll"
-os.environ["ESPEAK_DATA_PATH"] = r"C:\Program Files\eSpeak NG"
-
-# Set path explicitly in Phonemizer
-EspeakWrapper.set_library(r"C:\Program Files\eSpeak NG\libespeak-ng.dll")
-```
-
-Then, **restart your Jupyter Kernel** and check Phonemizer:  
-
-```python
-import phonemizer
-print(phonemizer.backend.EspeakBackend.is_available())  # Should print True
-```
-
-❌ **If it still prints `False`**, try renaming the DLL:  
-
-```powershell
-cd "C:\Program Files\eSpeak NG"
-rename libespeak-ng.dll espeak-ng.dll
-```
-
-Then restart Jupyter Notebook and test again.
+4. **Save the file (`Ctrl + S`)**.
+5. **Restart VS Code completely**.
 
 ---
 
-## **8️⃣ Download Pretrained Models (Since They're Not in Git)**  
+## **8️⃣ Verify Phonemizer Works with eSpeak NG**
 
-Because large `.pth` files are ignored, download them manually:
+Run this Python script inside your **styletts** Conda environment:
 
-```sh
-cd StyleTTS
-mkdir Models Vocoder
+```python
+from phonemizer import phonemize
 
-# Download using curl (or use your browser)
-curl -L -o Models.zip "https://huggingface.co/yl4579/StyleTTS/resolve/main/LJSpeech/Models.zip"
-curl -L -o Vocoder.zip "https://huggingface.co/yl4579/StyleTTS/resolve/main/LJSpeech/Vocoder.zip"
+text = "Hello, world!"
+phonemes = phonemize(text, language='en-us', backend='espeak')
+print("Phonemized Output:", phonemes)
+```
 
-# Extract the files
-unzip Models.zip -d Models
-unzip Vocoder.zip -d Vocoder
+✅ **Expected Output:**
+
+```text
+Phonemized Output: həlˈoʊ wɝːld
 ```
 
 ---
 
-## **9️⃣ Run Inference**  
+## **9️⃣ Run Inference with StyleTTS**
 
-Now, you can **generate speech from text**!  
-
-### **Option 1: Using Jupyter Notebook (Recommended)**  
-
-Start Jupyter inside your **VS Code terminal** or command prompt:  
+### **Option 1: Using Jupyter Notebook (Recommended)**
 
 ```sh
 jupyter notebook
 ```
 
-This will open Jupyter Notebook in your browser.  
-
-Open:  
-
-- **For LJSpeech:** `Demo/Inference_LJSpeech.ipynb`  
-- **For LibriTTS:** `Demo/Inference_LibriTTS.ipynb`  
-
-Run each cell to generate speech.
-
-#### **Real-Time Logs in Jupyter**  
-
-To see logs while running the notebook:  
-
-1. Open **Jupyter's main page (`localhost:8888/tree`)**.  
-2. Click **"New" > "Terminal"**.  
-3. Run:  
-
-   ```sh
-   conda activate styletts
-   jupyter notebook
-   ```
-
-Now, the **logs will appear in the terminal** while you run the notebook.
+- Open **`Demo/Inference_LJSpeech.ipynb`** and run the cells.
 
 ---
 
-### **Option 2: Using a Python Script**  
+### **Option 2: Using a Python Script**
 
-If you prefer a script, create `inference.py` and paste:  
+Create a file (e.g., `inference.py`) with:
 
 ```python
 import torch
-from models import *  # Load from models.py (not styletts2)
+from models import *
 
-try:
-    model = StyleTTS()  # Using the correct class from models.py
-except NameError:
-    print("❌ StyleTTS class not found in models.py. Check its name.")
-    exit()
-
+model = StyleTTS()
 text = "Hello, this is StyleTTS generating speech naturally."
 audio = model.inference(text)
+
 with open("output.wav", "wb") as f:
     f.write(audio)
+
 print("✅ Speech synthesis complete! Output saved as output.wav")
 ```
 
-Run it:  
+Then run it:
 
 ```sh
 python inference.py
 ```
 
-This generates `output.wav` with AI-generated speech.
-
 ---
 
-## **🔟 Final Sync: Keep Your Fork Up-to-Date**  
-
-To avoid conflicts, sync with upstream before changes:
+## **🔟 Final Sync: Keep Your Fork Up-to-Date**
 
 ```sh
 git fetch upstream
@@ -264,20 +217,17 @@ git push origin main
 
 ---
 
-## **🎯 Final Checklist**  
+## **🎯 Final Checklist**
 
-✅ Set up **VS Code workspace & Jupyter**  
-✅ Installed **dependencies**  
-✅ Installed **eSpeak NG & Phonemizer**  
-✅ Fixed **Phonemizer issues**  
-✅ Downloaded **pretrained models manually (.pth files are not in Git)**  
-✅ Ran **text-to-speech inference**  
+- ✅ **Fixed VS Code environment variable issues**
+- ✅ **Verified Phonemizer works with eSpeak NG**
+- ✅ **Ran text-to-speech inference successfully**
 
-🚀 **StyleTTS is now fully set up and ready to use!** 🚀  
+🚀 **StyleTTS is now fully set up and ready to use!** 🚀
 
 ---
 
-### **🔹 Optimized `.gitignore`**  
+## **🔹 Optimized `.gitignore`**
 
 ```gitignore
 # Ignore compiled Python files
@@ -286,13 +236,7 @@ __pycache__/
 *.pyo
 *.pyd
 
-# Ignore all models and vocoder files
-Models/
-Vocoder/
-Utils/ASR/
-
-# Ignore large specific model checkpoint files
+# Ignore model checkpoint files
 Models/LJSpeech/
 Vocoder/g_*
 Utils/ASR/epoch_*.pth
-```
