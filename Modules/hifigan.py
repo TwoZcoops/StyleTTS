@@ -415,34 +415,35 @@ class UpSample1d(nn.Module):
 
 class Decoder(nn.Module):
     def __init__(self, dim_in=512, F0_channel=512, style_dim=64, dim_out=80, 
-                resblock_kernel_sizes = [3,7,11],
-                upsample_rates = [10,5,3,2],
-                upsample_initial_channel=512,
-                resblock_dilation_sizes=[[1,3,5], [1,3,5], [1,3,5]],
-                upsample_kernel_sizes=[20,10,6,4]):
+                 resblock_kernel_sizes=[3,7,11],
+                 upsample_rates=[10,5,3,2],
+                 upsample_initial_channel=256,
+                 resblock_dilation_sizes=[[1,3,5], [1,3,5], [1,3,5]],
+                 upsample_kernel_sizes=[20,10,6,4]):
         super().__init__()
         
         self.decode = nn.ModuleList()
         
-        self.encode = AdainResBlk1d(dim_in + 2, 1024, style_dim)
+        # Change from 1024 to 512 to align with the checkpoint
+        self.encode = AdainResBlk1d(dim_in + 2, 512, style_dim)
         
-        self.decode.append(AdainResBlk1d(1024 + 2 + 64, 1024, style_dim))
-        self.decode.append(AdainResBlk1d(1024 + 2 + 64, 1024, style_dim))
-        self.decode.append(AdainResBlk1d(1024 + 2 + 64, 1024, style_dim))
-        self.decode.append(AdainResBlk1d(1024 + 2 + 64, 512, style_dim, upsample=True))
+        # Adjust subsequent blocks accordingly:
+        self.decode.append(AdainResBlk1d(512 + 2 + 64, 512, style_dim))
+        self.decode.append(AdainResBlk1d(512 + 2 + 64, 512, style_dim))
+        self.decode.append(AdainResBlk1d(512 + 2 + 64, 512, style_dim))
+        # Final block reduces channels to 256 if needed (or you can keep it at 512)
+        self.decode.append(AdainResBlk1d(512 + 2 + 64, 256, style_dim, upsample=True))
 
         self.F0_conv = weight_norm(nn.Conv1d(1, 1, kernel_size=3, stride=2, groups=1, padding=1))
-        
         self.N_conv = weight_norm(nn.Conv1d(1, 1, kernel_size=3, stride=2, groups=1, padding=1))
         
         self.asr_res = nn.Sequential(
             weight_norm(nn.Conv1d(512, 64, kernel_size=1)),
         )
         
-        
+        # Pass decoder parameters to the Generator (unchanged)
         self.generator = Generator(style_dim, resblock_kernel_sizes, upsample_rates, upsample_initial_channel, resblock_dilation_sizes, upsample_kernel_sizes)
 
-        
     def forward(self, asr, F0_curve, N, s):
         if self.training:
             downlist = [0, 3, 7]
@@ -450,11 +451,10 @@ class Decoder(nn.Module):
             downlist = [0, 3, 7, 15]
             N_down = downlist[random.randint(0, 3)]
             if F0_down:
-                F0_curve = nn.functional.conv1d(F0_curve.unsqueeze(1), torch.ones(1, 1, F0_down).to('cuda'), padding=F0_down//2).squeeze(1) / F0_down
+                F0_curve = nn.functional.conv1d(F0_curve.unsqueeze(1), torch.ones(1, 1, F0_down).to(F0_curve.device), padding=F0_down//2).squeeze(1) / F0_down
             if N_down:
-                N = nn.functional.conv1d(N.unsqueeze(1), torch.ones(1, 1, N_down).to('cuda'), padding=N_down//2).squeeze(1)  / N_down
+                N = nn.functional.conv1d(N.unsqueeze(1), torch.ones(1, 1, N_down).to(N.device), padding=N_down//2).squeeze(1)  / N_down
 
-        
         F0 = self.F0_conv(F0_curve.unsqueeze(1))
         N = self.N_conv(N.unsqueeze(1))
         
@@ -473,5 +473,3 @@ class Decoder(nn.Module):
                 
         x = self.generator(x, s, F0_curve)
         return x
-    
-    
